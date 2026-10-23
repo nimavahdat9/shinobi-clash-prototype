@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SHINOBI CLASH — Ashenroot Prototype</title>
+<style>
+  :root { color-scheme: dark; --cyan:#64e7ff; --gold:#ffc76a; --red:#ff617b; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#080d18; font-family:Inter,system-ui,Segoe UI,sans-serif; color:#f4f7ff; }
+  #game { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; }
+  #hud { position:fixed; inset:0; pointer-events:none; }
+  .panel { background:linear-gradient(135deg,rgba(11,20,38,.92),rgba(15,29,49,.78)); border:1px solid rgba(100,231,255,.3); box-shadow:0 10px 40px #0006; backdrop-filter:blur(8px); border-radius:12px; }
+  #brand { position:absolute; top:18px; left:18px; padding:12px 15px; max-width:min(440px,calc(100vw - 36px)); }
+  #brand strong { letter-spacing:.16em; font-size:13px; color:var(--cyan); display:block; }
+  #brand span { display:block; margin-top:4px; font-size:11px; color:#b8c8dd; letter-spacing:.08em; }
+  #status { position:absolute; top:18px; right:18px; padding:12px 15px; min-width:190px; text-align:right; }
+  .small { font-size:11px; color:#aabbd2; letter-spacing:.08em; }
+  #status strong { display:block; font-size:13px; margin-top:3px; }
+  #bars { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); width:min(460px,calc(100vw - 28px)); padding:13px; }
+  .bar-label { display:flex; justify-content:space-between; font-size:11px; color:#dce7f7; margin:0 0 5px; }
+  .bar { height:10px; background:#1a2638; border-radius:20px; overflow:hidden; margin-bottom:10px; }
+  .fill { height:100%; width:100%; transition:width .12s; border-radius:20px; }
+  #hp { background:linear-gradient(90deg,#e83e68,#ff8a9a); }
+  #chakra { background:linear-gradient(90deg,#188dc7,#70efff); }
+  #abilities { display:flex; gap:8px; justify-content:center; margin-top:4px; }
+  .ability { width:54px; height:54px; border:1px solid #52718d; background:#14253a; border-radius:9px; display:grid; place-items:center; position:relative; color:#fff; font-weight:800; font-size:17px; }
+  .ability span { position:absolute; bottom:3px; font-size:9px; color:#b9c9dd; font-weight:500; }
+  .ability.cooling { opacity:.45; border-color:#ff617b; }
+  #help { position:absolute; bottom:24px; left:18px; padding:12px 14px; max-width:270px; }
+  #help strong { display:block; color:var(--gold); font-size:11px; letter-spacing:.1em; margin-bottom:6px; }
+  #help p { margin:3px 0; color:#c0cde0; font-size:11px; line-height:1.45; }
+  #message { position:absolute; top:26%; left:50%; transform:translateX(-50%); text-align:center; color:#fff; font-size:14px; font-weight:700; letter-spacing:.08em; text-shadow:0 2px 14px #000; }
+  #message em { display:block; font-style:normal; font-size:11px; color:#b5c9e3; font-weight:500; margin-top:6px; letter-spacing:.03em; }
+  #restart { pointer-events:auto; display:none; border:1px solid var(--cyan); border-radius:8px; background:#112a3d; color:white; padding:9px 15px; margin-top:12px; cursor:pointer; }
+  #toast { position:absolute; top:18px; left:50%; transform:translateX(-50%); color:#d6f8ff; font-size:11px; text-align:center; }
+  @media(max-width:650px) {
+    #brand { top:10px; left:10px; padding:9px 11px; }
+    #status { top:10px; right:10px; padding:9px 11px; min-width:135px; }
+    #help { left:10px; bottom:150px; max-width:190px; padding:9px; }
+    #bars { bottom:10px; }
+    .ability { width:46px; height:46px; }
+    #message { top:23%; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div id="brand" class="panel"><strong>SHINOBI CLASH</strong><span>THE LEGENDS OF CHAKRA · ASHENROOT PROTOTYPE</span></div>
+  <div id="status" class="panel"><div class="small">PLAYABLE PROTOTYPE</div><strong id="kills">GUARDIANS DEFEATED: 0</strong><div class="small" style="margin-top:5px">HERO · KAGETSURA VANGUARD</div></div>
+  <div id="toast"></div>
+  <div id="message">THE DISPUTED VALLEY<em>Defeat the training guardians and test your chakra.</em><button id="restart">Restart Trial</button></div>
+  <div id="help" class="panel"><strong>FIELD MANUAL</strong><p><b>W A S D</b> — Move</p><p><b>Mouse</b> — Aim / point toward target</p><p><b>Left click / Space</b> — Chakra blade strike</p><p><b>Q</b> — Storm step (dash)</p><p><b>E</b> — Ember bolt (projectile)</p><p><b>R</b> — Sundering burst (ultimate)</p></div>
+  <div id="bars" class="panel">
+    <div class="bar-label"><span>VITALITY</span><span id="hpText">100 / 100</span></div><div class="bar"><div id="hp" class="fill"></div></div>
+    <div class="bar-label"><span>CHAKRA</span><span id="chakraText">100 / 100</span></div><div class="bar"><div id="chakra" class="fill"></div></div>
+    <div id="abilities">
+      <div class="ability" id="aQ">Q<span>STORM STEP</span></div>
+      <div class="ability" id="aE">E<span>EMBER BOLT</span></div>
+      <div class="ability" id="aR">R<span>SUNDERING</span></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+
+const root = document.querySelector('#game');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080d18);
+scene.fog = new THREE.Fog(0x080d18, 24, 68);
+
+const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, 0.1, 150);
+camera.position.set(0, 13, 17);
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+root.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0x9dc9ff, 0x1b261c, 2.1));
+const keyLight = new THREE.DirectionalLight(0xffd5a0, 3.0);
+keyLight.position.set(-7, 15, 8); keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024,1024); scene.add(keyLight);
+const blueLight = new THREE.PointLight(0x28aaff, 30, 22); blueLight.position.set(5,4,-5); scene.add(blueLight);
+const emberLight = new THREE.PointLight(0xff5a22, 18, 16); emberLight.position.set(-7,3,3); scene.add(emberLight);
+
+const mat = (color, roughness=.72, metalness=.05, emissive=0x000000) => new THREE.MeshStandardMaterial({color,roughness,metalness,emissive});
+const floorMat = mat(0x1a2b2c);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(72,72), floorMat);
+floor.rotation.x=-Math.PI/2; floor.position.y=-.06; floor.receiveShadow=true; scene.add(floor);
+const grid = new THREE.GridHelper(72,36,0x426b70,0x29434a); grid.position.y=-.045; scene.add(grid);
+
+// Arena ring and scattered ancient stones
+const ringMat = new THREE.MeshStandardMaterial({color:0x4c7b82, emissive:0x0c3038, metalness:.3, roughness:.55});
+const ring = new THREE.Mesh(new THREE.TorusGeometry(11.5,.12,8,100), ringMat);
+ring.rotation.x=Math.PI/2; ring.position.y=.03; scene.add(ring);
+const stoneMat=mat(0x394956), crystalMat=mat(0x64dfff,.25,.4,0x0d7894);
+for(let i=0;i<18;i++){
+  const a=i/18*Math.PI*2, r=14+Math.sin(i*3.1)*2.2;
+  const h=1.1+(i%4)*.45;
+  const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.6+(i%3)*.22,0), i%4===0?crystalMat:stoneMat);
+  rock.position.set(Math.cos(a)*r,h/2-0.05,Math.sin(a)*r);
+  rock.scale.y=h; rock.rotation.set(i*.7,i*1.3,i*.2); rock.castShadow=true; rock.receiveShadow=true; scene.add(rock);
+}
+for(let i=0;i<7;i++){
+  const p=new THREE.Group(); const a=i/7*Math.PI*2;
+  p.position.set(Math.cos(a)*8.4,0,Math.sin(a)*8.4);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(.6,.85,.25,6),mat(0x263a48)); base.position.y=.12; p.add(base);
+  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(.48),crystalMat); crystal.position.y=.85; crystal.scale.y=1.7; crystal.castShadow=true; p.add(crystal); scene.add(p);
+}
+
+// Decorative central Chakra Well
+const wellBase=new THREE.Mesh(new THREE.CylinderGeometry(1.6,2.1,.45,8),mat(0x263947,.4,.3));
+wellBase.position.set(0,.1,0); wellBase.castShadow=true; scene.add(wellBase);
+const wellCore=new THREE.Mesh(new THREE.OctahedronGeometry(.85),mat(0x55dfff,.2,.2,0x0a829b));
+wellCore.position.set(0,1.35,0); wellCore.rotation.y=.4; scene.add(wellCore);
+const wellHalo=new THREE.Mesh(new THREE.TorusGeometry(1.25,.055,8,64),mat(0x8aefff,.25,.1,0x168da5));
+wellHalo.rotation.x=Math.PI/2; wellHalo.position.y=.75; scene.add(wellHalo);
+
+// Stylized original hero built from primitive geometry; no external assets.
+function makeWarrior({body=0x263b59, glow=0x56dfff, enemy=false}={}) {
+  const g=new THREE.Group();
+  const bodyMat=mat(body,.55,.12), dark=mat(0x101927,.75), glowMat=mat(glow,.3,.15,glow);
+  const skin=mat(enemy?0xb8c5d8:0xe1b997,.75);
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.43,.75,4,8),bodyMat); torso.position.y=1.25; torso.castShadow=true; g.add(torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.31,12,10),skin); head.position.y=2.02; head.castShadow=true; g.add(head);
+  const hood=new THREE.Mesh(new THREE.ConeGeometry(.42,.55,8),dark); hood.position.set(0,2.34,0); hood.rotation.x=Math.PI; hood.castShadow=true; g.add(hood);
+  const sash=new THREE.Mesh(new THREE.BoxGeometry(.76,.13,.52),glowMat); sash.position.set(0,1.5,.04); g.add(sash);
+  for(const s of [-1,1]){
+    const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.13,.47,3,6),bodyMat); arm.position.set(s*.52,1.3,0); arm.rotation.z=s*-.22; arm.castShadow=true; g.add(arm);
+    const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.46,3,6),dark); leg.position.set(s*.22,.42,0); leg.castShadow=true; g.add(leg);
+  }
+  const blade=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,1.25),glowMat); blade.position.set(.52,1.1,.62); blade.rotation.x=-.25; blade.rotation.y=-.25; blade.castShadow=true; g.add(blade);
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(.48,.035,6,32),glowMat); halo.rotation.x=Math.PI/2; halo.position.y=2.35; g.add(halo);
+  g.userData={blade,glowMat,bodyMat};
+  return g;
+}
+const player=makeWarrior();
+player.position.set(0,0,5); scene.add(player);
+const playerState={hp:100,maxHp:100,chakra:100,maxChakra:100,alive:true,speed:6.3,attackCd:0, dashCd:0, boltCd:0, ultCd:0, invuln:0, kills:0};
+const enemies=[];
+function spawnEnemy(x,z,variant=0){
+  const obj=makeWarrior({body:variant?0x512d3c:0x34304e,glow:variant?0xff6a54:0xb27aff,enemy:true});
+  obj.position.set(x,0,z); scene.add(obj);
+  const e={obj,hp:variant?75:60,maxHp:variant?75:60,alive:true,attackCd:1+Math.random(),speed:variant?1.7:2.05,variant,flash:0};
+  enemies.push(e); return e;
+}
+spawnEnemy(-5,-2,0); spawnEnemy(5,-3,1); spawnEnemy(-3,1,0); spawnEnemy(4,3,1);
+
+const projectiles=[], effects=[];
+function addEffect(mesh,life,update){scene.add(mesh);effects.push({mesh,life,max:life,update});}
+function burst(pos,color=0x58e7ff,scale=1){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(.4,12,8),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.75,wireframe:true}));
+  m.position.copy(pos); addEffect(m,.38,e=>{e.mesh.scale.setScalar(1+(1-e.life/e.max)*scale*4);e.mesh.material.opacity=Math.max(0,e.life/e.max);});
+}
+function ringEffect(pos,color,radius){
+  const m=new THREE.Mesh(new THREE.TorusGeometry(radius,.08,6,48),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9}));
+  m.rotation.x=Math.PI/2;m.position.copy(pos);addEffect(m,.45,e=>{e.mesh.scale.setScalar(1+(1-e.life/e.max)*.45);e.mesh.material.opacity=e.life/e.max;});
+}
+function damageEnemy(e,amount,color=0x65eaff){
+  if(!e.alive)return;
+  e.hp-=amount; burst(e.obj.position.clone().add(new THREE.Vector3(0,1,0)),color,.4);
+  e.obj.userData.glowMat.emissive.setHex(color);
+  setTimeout(()=>{if(e.obj?.userData?.glowMat)e.obj.userData.glowMat.emissive.setHex(e.variant?0xff6a54:0xb27aff)},100);
+  if(e.hp<=0){e.alive=false; scene.remove(e.obj);playerState.kills++;document.querySelector('#kills').textContent='GUARDIANS DEFEATED: '+playerState.kills; playerState.chakra=Math.min(100,playerState.chakra+14); toast('Guardian defeated · +14 chakra');}
+}
+function nearestEnemy(maxDist=4){
+  let best=null,bd=maxDist;
+  for(const e of enemies){if(!e.alive)continue;const d=e.obj.position.distanceTo(player.position);if(d<bd){best=e;bd=d;}}
+  return best;
+}
+function aimDirection(){
+  const forward=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion); return forward.normalize();
+}
+function orientToPointer(ev){
+  const rect=renderer.domElement.getBoundingClientRect();
+  const nx=(ev.clientX-rect.left)/rect.width*2-1, ny=-(ev.clientY-rect.top)/rect.height*2+1;
+  const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(nx,ny),camera);
+  const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);const point=new THREE.Vector3();
+  if(ray.ray.intersectPlane(plane,point)){const d=point.sub(player.position);d.y=0;if(d.lengthSq()>.1)player.rotation.y=Math.atan2(d.x,d.z);}
+}
+let pointerX=innerWidth/2,pointerY=innerHeight/2;
+renderer.domElement.addEventListener('pointermove',ev=>{pointerX=ev.clientX;pointerY=ev.clientY;orientToPointer(ev);});
+renderer.domElement.addEventListener('pointerdown',ev=>{orientToPointer(ev);if(ev.button===0)basicAttack();});
+function basicAttack(){
+  if(!playerState.alive||playerState.attackCd>0)return;
+  playerState.attackCd=.42;
+  const target=nearestEnemy(3.6);
+  const pos=player.position.clone().add(new THREE.Vector3(0,1,0));
+  ringEffect(player.position.clone().add(new THREE.Vector3(0,.1,0)),0x68eaff,1.05);
+  if(target)damageEnemy(target,18,0x65eaff);
+  else {
+    const dir=aimDirection();
+    const slash=new THREE.Mesh(new THREE.BoxGeometry(1.6,.06,.13),new THREE.MeshBasicMaterial({color:0x8df4ff,transparent:true,opacity:.85}));
+    slash.position.copy(pos).add(dir.clone().multiplyScalar(1.15));slash.rotation.y=player.rotation.y;addEffect(slash,.16,e=>{e.mesh.material.opacity=e.life/e.max;});
+  }
+}
+function dash(){
+  if(!playerState.alive||playerState.dashCd>0||playerState.chakra<18)return;
+  playerState.chakra-=18;playerState.dashCd=4;
+  const d=aimDirection();player.position.add(d.multiplyScalar(4.2));
+  player.position.x=THREE.MathUtils.clamp(player.position.x,-17,17);player.position.z=THREE.MathUtils.clamp(player.position.z,-17,17);
+  burst(player.position.clone().add(new THREE.Vector3(0,1,0)),0x61e9ff,1.1);toast('Storm Step');
+}
+function bolt(){
+  if(!playerState.alive||playerState.boltCd>0||playerState.chakra<24)return;
+  playerState.chakra-=24;playerState.boltCd=2.8;
+  const d=aimDirection();const mesh=new THREE.Mesh(new THREE.SphereGeometry(.24,12,10),new THREE.MeshStandardMaterial({color:0xff9b49,emissive:0xff4a0a,emissiveIntensity:2}));
+  mesh.position.copy(player.position).add(new THREE.Vector3(0,1.2,0)).add(d.clone().multiplyScalar(1.2));
+  scene.add(mesh);projectiles.push({mesh,dir:d,speed:13,life:1.3,damage:32,color:0xff823c});
+  toast('Ember Bolt · 24 chakra');
+}
+function ultimate(){
+  if(!playerState.alive||playerState.ultCd>0||playerState.chakra<55)return;
+  playerState.chakra-=55;playerState.ultCd=9;
+  ringEffect(player.position.clone().add(new THREE.Vector3(0,.15,0)),0xffb15c,2.2);
+  burst(player.position.clone().add(new THREE.Vector3(0,1,0)),0xffa34a,2.4);
+  for(const e of enemies){if(e.alive&&e.obj.position.distanceTo(player.position)<6)damageEnemy(e,48,0xffa34a);}
+  toast('Sundering Burst · ultimate');
+}
+const keys={};let toastTimer=0;
+function toast(msg){const el=document.querySelector('#toast');el.textContent=msg;toastTimer=1.6;}
+addEventListener('keydown',ev=>{
+  const k=ev.key.toLowerCase();keys[k]=true;
+  if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))ev.preventDefault();
+  if(k==='q')dash();if(k==='e')bolt();if(k==='r')ultimate();if(k===' ' )basicAttack();
+});
+addEventListener('keyup',ev=>keys[ev.key.toLowerCase()]=false);
+document.querySelector('#restart').addEventListener('click',()=>{
+  for(const e of enemies){if(e.obj.parent)scene.remove(e.obj);e.alive=false;}
+  enemies.length=0;spawnEnemy(-5,-2,0);spawnEnemy(5,-3,1);spawnEnemy(-3,1,0);spawnEnemy(4,3,1);
+  player.position.set(0,0,5);playerState.hp=100;playerState.chakra=100;playerState.alive=true;playerState.kills=0;
+  playerState.dashCd=playerState.boltCd=playerState.ultCd=0;
+  document.querySelector('#kills').textContent='GUARDIANS DEFEATED: 0';document.querySelector('#restart').style.display='none';document.querySelector('#message').style.display='block';
+  setTimeout(()=>{document.querySelector('#message').style.display='none'},2200);
+});
+const clock=new THREE.Clock();
+function updateUI(){
+  document.querySelector('#hp').style.width=(playerState.hp/playerState.maxHp*100)+'%';
+  document.querySelector('#chakra').style.width=(playerState.chakra/playerState.maxChakra*100)+'%';
+  document.querySelector('#hpText').textContent=Math.ceil(playerState.hp)+' / 100';
+  document.querySelector('#chakraText').textContent=Math.floor(playerState.chakra)+' / 100';
+  for(const [id,cd] of [['aQ',playerState.dashCd],['aE',playerState.boltCd],['aR',playerState.ultCd]]){
+    const el=document.getElementById(id);el.classList.toggle('cooling',cd>0);
+    const labels={aQ:'STORM STEP',aE:'EMBER BOLT',aR:'SUNDERING'};
+    el.querySelector('span').textContent=cd>0?cd.toFixed(1)+'s':labels[id];
+  }
+}
+let elapsed=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);elapsed+=dt;
+  if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)document.querySelector('#toast').textContent='';}
+  if(playerState.alive){
+    playerState.chakra=Math.min(100,playerState.chakra+dt*3.1);
+    playerState.attackCd=Math.max(0,playerState.attackCd-dt);
+    playerState.dashCd=Math.max(0,playerState.dashCd-dt);
+    playerState.boltCd=Math.max(0,playerState.boltCd-dt);
+    playerState.ultCd=Math.max(0,playerState.ultCd-dt);
+    const move=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
+    if(move.lengthSq()>0){move.normalize();player.position.add(move.multiplyScalar(playerState.speed*dt));player.position.x=THREE.MathUtils.clamp(player.position.x,-18,18);player.position.z=THREE.MathUtils.clamp(player.position.z,-18,18);
+      // Face movement only when pointer has not moved recently is not needed: mouse aim is authoritative.
+    }
+    // Simple enemy training AI: approach, then deal contact damage.
+    for(const e of enemies){if(!e.alive)continue;const to=player.position.clone().sub(e.obj.position);to.y=0;const dist=to.length();
+      if(dist>1.45){to.normalize();e.obj.position.add(to.multiplyScalar(e.speed*dt));e.obj.rotation.y=Math.atan2(to.x,to.z);}
+      else {e.attackCd-=dt;if(e.attackCd<=0){e.attackCd=1.25;playerState.hp-=7;burst(player.position.clone().add(new THREE.Vector3(0,1,0)),0xff526f,.45);if(playerState.hp<=0){playerState.hp=0;playerState.alive=false;document.querySelector('#message').innerHTML='TRIAL ENDED<em>Your shinobi has fallen. Restart to try again.</em><button id="restart" style="display:inline-block">Restart Trial</button>';document.querySelector('#restart').addEventListener('click',()=>location.reload());document.querySelector('#message').style.display='block';}}}
+    }
+  }
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p=projectiles[i];p.life-=dt;p.mesh.position.add(p.dir.clone().multiplyScalar(p.speed*dt));
+    let hit=false;
+    for(const e of enemies){if(e.alive&&e.obj.position.distanceTo(p.mesh.position)<.9){damageEnemy(e,p.damage,p.color);hit=true;break;}}
+    if(hit||p.life<=0){scene.remove(p.mesh);projectiles.splice(i,1);}
+  }
+  for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;if(e.update)e.update(e);if(e.life<=0){scene.remove(e.mesh);e.mesh.geometry?.dispose();if(e.mesh.material?.dispose)e.mesh.material.dispose();effects.splice(i,1);}}
+  wellCore.rotation.y+=dt*.55;wellCore.rotation.x+=dt*.18;wellHalo.rotation.z+=dt*.35;
+  // Smooth top-down three-quarter follow camera.
+  const desired=new THREE.Vector3(player.position.x,13.5,player.position.z+16);
+  camera.position.lerp(desired,.09);camera.lookAt(player.position.x,0,player.position.z-1.8);
+  updateUI();renderer.render(scene,camera);
+}
+setTimeout(()=>{document.querySelector('#message').style.display='none'},4200);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+animate();
+</script>
+</body>
+</html>
